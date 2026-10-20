@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<!--
+  LAYOUT PLAN
+  Slide 1 (single visual, exported to docs/architecture.png for the article):
+    Component J — Architecture Band, light theme. Five columns left to right:
+    scattered post-market evidence → AI Functions extract structure → governed in Unity Catalog
+    → Genie agent (hero, chat-mockup with the human question and answer chips) → people who decide.
+    A slim rounded rail underneath carries the compliance guarantees (permissions + mask, one metric
+    definition, audit trail, orchestration, Free Edition).
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Post-market surveillance with Databricks Genie — architecture</title>
+<style>
+:root{
+  --primary:#FF3621; --dark:#1B3139;
+  --green:#1E8A44; --red:#D32F2F; --orange:#E65100; --blue:#0288D1; --purple:#6A1B9A; --teal:#00838F;
+  --bg-page:#FAFAFA; --bg-section:#F5F6F7; --bd-section:#D9DCE0; --text:#1A1A1A; --text-muted:#5F6B70;
+  --tint-orange:#FFF2E6; --tint-purple:#F5ECFA; --tint-blue:#EAF5FC; --tint-red:#FFEEEB; --tint-green:#EAF6EE;
+  --card:#FFFFFF; --shadow:0 6px 22px rgba(27,49,57,.08);
+  --fit:min(calc(100vw / 1600px), calc(100vh / 900px));
+}
+html{color-scheme:light;}
+*{box-sizing:border-box;}
+body{margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
+  background:var(--bg-page); color:var(--text); overflow:hidden;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+.slide{position:fixed; inset:0; display:none; overflow:hidden; background:var(--bg-page);}
+.slide.active{display:block;}
+.stage{position:absolute; left:50%; top:50%;
+  width:min(calc(100vw / var(--fit)), 2100px); height:min(calc(100vh / var(--fit)), 1200px);
+  display:flex; flex-direction:column; overflow:hidden; background:var(--bg-page);
+  padding:36px 48px 32px; transform-origin:center center; transform:translate(-50%,-50%) scale(var(--fit));}
+
+/* header */
+.kicker{font-size:.95rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:var(--primary); margin:0 0 10px;}
+h2{font-size:2.5rem; line-height:1.1; margin:0; font-weight:800; color:var(--dark);}
+.subtitle{color:var(--text-muted); font-size:1.2rem; margin:10px 0 20px; max-width:80ch; line-height:1.45;}
+
+/* band */
+.band{flex:1; min-height:0; display:flex; align-items:stretch; gap:10px;}
+.col{display:flex; flex-direction:column; gap:12px; min-width:0;}
+.c-src{flex:1;} .c-ext{flex:1;} .c-uc{flex:1;} .c-genie{flex:1.5;} .c-ppl{flex:1;}
+.chead{display:flex; align-items:center; gap:10px; font-size:.85rem; font-weight:800; letter-spacing:.1em;
+  text-transform:uppercase; padding:7px 14px 7px 7px; border-radius:999px; align-self:flex-start; color:#fff;}
+.chead .n{width:26px; height:26px; border-radius:50%; background:rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; font-size:.85rem;}
+.h-orange{background:var(--orange);} .h-purple{background:var(--purple);} .h-blue{background:var(--blue);}
+.h-red{background:var(--primary);} .h-green{background:var(--green);}
+.stack{flex:1; display:flex; flex-direction:column; justify-content:space-between; gap:12px;}
+.ar{display:flex; align-items:center; justify-content:center; flex:0 0 30px; padding-top:44px;}
+.ar svg{width:30px; height:30px; color:#A7B3B7;}
+
+/* item cards: borderless, soft shadow, icon token */
+.item{background:var(--card); border-radius:16px; box-shadow:var(--shadow); padding:12px 14px;
+  display:flex; align-items:center; gap:14px; flex:1;}
+.token{width:46px; height:46px; border-radius:50%; flex:0 0 auto; display:flex; align-items:center; justify-content:center;}
+.token svg{width:24px; height:24px;}
+.t-orange{background:var(--tint-orange); color:var(--orange);} .t-purple{background:var(--tint-purple); color:var(--purple);}
+.t-blue{background:var(--tint-blue); color:var(--blue);} .t-green{background:var(--tint-green); color:var(--green);}
+.t-red{background:var(--tint-red); color:var(--primary);}
+.it{font-weight:800; font-size:1.08rem; line-height:1.2;}
+.is{font-size:.93rem; color:var(--text-muted); margin-top:4px; line-height:1.35;}
+.flag{display:inline-block; margin-top:6px; font-size:.78rem; font-weight:800; color:var(--orange);
+  background:var(--tint-orange); border-radius:999px; padding:3px 9px;}
+code.fn{font-family:'SF Mono',Menlo,monospace; font-size:.95rem; font-weight:700; color:var(--purple);}
+.note{font-size:.88rem; color:var(--purple); font-weight:700; text-align:center; background:var(--tint-purple);
+  border-radius:12px; padding:10px 12px; line-height:1.35;}
+.mv{box-shadow:0 0 0 3px rgba(2,136,209,.35), var(--shadow);}
+
+/* Genie hero */
+.genie{flex:1; background:linear-gradient(160deg,#FFFFFF 0%,#FFF5F3 100%); border-radius:22px;
+  box-shadow:0 0 0 2px rgba(255,54,33,.18), 0 18px 44px rgba(255,54,33,.16); padding:18px 20px;
+  display:flex; flex-direction:column; gap:12px;}
+.gtop{display:flex; align-items:center; gap:12px;}
+.gtop .it{font-size:1.2rem;}
+.bubble{align-self:flex-end; max-width:92%; background:var(--dark); color:#fff; border-radius:18px 18px 4px 18px;
+  padding:12px 16px; font-size:1.02rem; line-height:1.4;}
+.answer{background:#fff; border-radius:18px 18px 18px 4px; padding:16px 18px; box-shadow:var(--shadow);
+  display:flex; flex-direction:column; gap:12px; flex:1; justify-content:space-evenly;}
+.answer .lead{font-size:.98rem; line-height:1.4; color:var(--text);}
+.steps{display:grid; grid-template-columns:1fr 1fr; gap:10px; grid-auto-rows:1fr;}
+.chip{display:flex; align-items:center; gap:8px; background:var(--bg-section); border-radius:12px; padding:10px 12px;
+  font-size:.95rem; font-weight:700; color:var(--dark); line-height:1.25;}
+.chip .k{width:26px; height:26px; border-radius:50%; background:var(--primary); color:#fff; font-size:.75rem;
+  display:flex; align-items:center; justify-content:center; flex:0 0 auto;}
+.gfoot{display:flex; gap:8px; flex-wrap:wrap;}
+.mini{font-size:.82rem; font-weight:700; color:var(--primary); background:var(--tint-red); border-radius:999px; padding:5px 11px;}
+
+/* rail */
+.rail{margin-top:18px; display:flex; align-items:center; gap:18px; background:var(--card); border-radius:999px;
+  box-shadow:var(--shadow); padding:12px 26px 12px 12px;}
+.rail .rt{font-weight:800; font-size:1.05rem; color:var(--dark); white-space:nowrap;}
+.rail .chips{display:flex; gap:10px; margin-left:auto; flex-wrap:nowrap;}
+.minichip{display:inline-flex; align-items:center; gap:8px; font-size:.88rem; font-weight:700; color:var(--dark);
+  background:var(--bg-section); border-radius:999px; padding:7px 13px; white-space:nowrap;}
+.minichip .dot{width:9px; height:9px; border-radius:50%;}
+
+/* entrance animation */
+.reveal{opacity:0;}
+.slide.active .reveal{animation:up .6s cubic-bezier(.22,.61,.36,1) forwards;}
+.d1{animation-delay:.05s!important;} .d2{animation-delay:.2s!important;} .d3{animation-delay:.35s!important;}
+.d4{animation-delay:.5s!important;} .d5{animation-delay:.65s!important;} .d6{animation-delay:.8s!important;}
+@keyframes up{from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:none;}}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1!important; animation:none!important;}}
+/* #static: no motion, no nav (used to export docs/architecture.png) */
+.static .reveal{opacity:1!important; animation:none!important;} .static .foot{display:none!important;}
+
+.foot{position:fixed; bottom:14px; right:18px; z-index:10; display:flex; align-items:center; gap:6px; padding:6px 8px;
+  border-radius:12px; background:rgba(255,255,255,.88); box-shadow:0 4px 16px rgba(0,0,0,.16); transition:opacity .4s;}
+.foot.autohide.idle{opacity:0;}
+.foot button{border:1px solid var(--bd-section); background:#fff; color:var(--text); border-radius:6px; height:30px; padding:0 10px; cursor:pointer; font-size:.85rem;}
+@media print{ @page{size:1600px 900px; margin:0;}
+  html,body{overflow:visible!important;} .foot{display:none!important;}
+  .slide{position:relative!important; display:block!important; width:1600px!important; height:900px!important;}
+  .stage{transform:none!important; left:0!important; top:0!important; width:1600px!important; height:900px!important;}
+  .reveal{opacity:1!important; animation:none!important;} }
+@media (max-width:700px){ .band{flex-direction:column;} .ar{display:none;} }
+</style>
+</head>
+<body>
+<section class="slide active"><div class="stage">
+  <p class="kicker reveal d1">How it works · post-market surveillance with Databricks Genie</p>
+  <h2 class="reveal d1">From scattered evidence to an answer you can trace</h2>
+  <p class="subtitle reveal d2">Records, free text and PDFs become governed data. Genie investigates it; people make the regulated calls.</p>
+
+  <div class="band">
+    <!-- 1 sources -->
+    <div class="col c-src reveal d2">
+      <span class="chead h-orange"><span class="n">1</span>Evidence</span>
+      <div class="stack">
+        <div class="item"><span class="token t-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H8l-5 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 9h8M8 13h5"/></svg></span>
+          <div><div class="it">Complaint intake</div><div class="is">record + free-text narrative</div><span class="flag">lot blank in 54% of records</span></div></div>
+        <div class="item"><span class="token t-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16"/></svg></span>
+          <div><div class="it">Lots · shipments · suppliers</div><div class="is">manufacturing + distribution tables</div></div></div>
+        <div class="item"><span class="token t-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></span>
+          <div><div class="it">Service tickets</div><div class="is">technician notes on returned units</div></div></div>
+        <div class="item"><span class="token t-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
+          <div><div class="it">CAPA reports</div><div class="is">investigation PDFs in a volume</div></div></div>
+      </div>
+    </div>
+
+    <div class="ar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg></div>
+
+    <!-- 2 extract -->
+    <div class="col c-ext reveal d3">
+      <span class="chead h-purple"><span class="n">2</span>Extract</span>
+      <div class="stack">
+        <div class="item"><span class="token t-purple"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2z"/><path d="M19 14l.9 2.6L22 17.5l-2.1.9L19 21l-.9-2.6L16 17.5l2.1-.9L19 14z"/></svg></span>
+          <div><code class="fn">ai_extract</code><div class="is">narratives → failure mode, patient injury, lot number</div></div></div>
+        <div class="item"><span class="token t-purple"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2z"/><path d="M19 14l.9 2.6L22 17.5l-2.1.9L19 21l-.9-2.6L16 17.5l2.1-.9L19 14z"/></svg></span>
+          <div><code class="fn">ai_extract</code><div class="is">technician notes → defect confirmed, part replaced</div></div></div>
+        <div class="item"><span class="token t-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/><path d="M9 14l2 2 4-4"/></svg></span>
+          <div><code class="fn">ai_parse_document</code><div class="is">CAPA PDFs → CAPA no., lots, root cause, risk</div></div></div>
+        <div class="note">Plain SQL. The original text stays next to every extracted value.</div>
+      </div>
+    </div>
+
+    <div class="ar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg></div>
+
+    <!-- 3 unity catalog -->
+    <div class="col c-uc reveal d4">
+      <span class="chead h-blue"><span class="n">3</span>Unity Catalog</span>
+      <div class="stack">
+        <div class="item mv"><span class="token t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>
+          <div><div class="it">Metric views</div><div class="is">complaint rate per 1,000 units, defined once</div></div></div>
+        <div class="item"><span class="token t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16"/></svg></span>
+          <div><div class="it">Complaints, enriched</div><div class="is">lot resolved, supplier joined, narrative kept</div></div></div>
+        <div class="item"><span class="token t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16"/></svg></span>
+          <div><div class="it">Service findings</div><div class="is">returned-unit evaluations</div></div></div>
+        <div class="item"><span class="token t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
+          <div><div class="it">CAPA documents</div><div class="is">extracted fields + full text</div></div></div>
+      </div>
+    </div>
+
+    <div class="ar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg></div>
+
+    <!-- 4 genie (hero) -->
+    <div class="col c-genie reveal d5">
+      <span class="chead h-red"><span class="n">4</span>Genie coworker</span>
+      <div class="genie">
+        <div class="gtop"><span class="token t-red"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8L12 2z"/><path d="M19 14l.9 2.6L22 17.5l-2.1.9L19 21l-.9-2.6L16 17.5l2.1-.9L19 14z"/></svg></span>
+          <div><div class="it">Genie agent</div><div class="is">instructions · trusted SQL · benchmarks</div></div></div>
+        <div class="bubble">“Complaints have been going up lately. What’s driving it, and is anyone already looking into it?”</div>
+        <div class="answer">
+          <div class="lead"><b>Agent mode</b> runs several queries and connects the evidence:</div>
+          <div class="steps">
+            <div class="chip"><span class="k">1</span>BP monitor rate up 4x</div>
+            <div class="chip"><span class="k">2</span>Cuff deflation</div>
+            <div class="chip"><span class="k">3</span>3 lots, new supplier</div>
+            <div class="chip"><span class="k">4</span>Open CAPA confirms</div>
+          </div>
+        </div>
+        <div class="gfoot"><span class="mini">Shows the SQL for every step</span></div>
+      </div>
+    </div>
+
+    <div class="ar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg></div>
+
+    <!-- 5 people -->
+    <div class="col c-ppl reveal d6">
+      <span class="chead h-green"><span class="n">5</span>People decide</span>
+      <div class="stack">
+        <div class="item"><span class="token t-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></span>
+          <div><div class="it">Quality engineer</div><div class="is">checks the SQL and source text</div></div></div>
+        <div class="item"><span class="token t-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <div><div class="it">Regulatory team</div><div class="is">decides reportability; Genie only flags it</div></div></div>
+        <div class="item"><span class="token t-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 13l2 2 4-4"/></svg></span>
+          <div><div class="it">Auditor</div><div class="is">sees who asked what and which SQL ran</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rail reveal d6">
+    <span class="token t-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></span>
+    <span class="rt">Compliance built in</span>
+    <span class="chips">
+      <span class="minichip"><span class="dot" style="background:var(--blue)"></span>Runs as the person asking + privacy mask</span>
+      <span class="minichip"><span class="dot" style="background:var(--blue)"></span>One metric definition</span>
+      <span class="minichip"><span class="dot" style="background:var(--primary)"></span>Every question logged</span>
+      <span class="minichip"><span class="dot" style="background:var(--purple)"></span>Lakeflow Job</span>
+      <span class="minichip"><span class="dot" style="background:var(--green)"></span>Serverless only</span>
+    </span>
+  </div>
+</div></section>
+
+<div class="foot autohide"><span class="nav"><button id="fs" title="Full screen (F)">⛶</button><button id="dl" title="Save as PDF">⤓ PDF</button></span></div>
+<script>
+if(location.hash==='#static') document.documentElement.classList.add('static');
+const cssFit=CSS.supports('transform','scale(calc(10px / 5px))');
+function fit(){ if(cssFit) return; document.documentElement.style.setProperty('--fit', Math.min(innerWidth/1600, innerHeight/900)); }
+if(window.ResizeObserver) new ResizeObserver(fit).observe(document.documentElement); fit();
+const foot=document.querySelector('.foot'); let idleT;
+function wake(){ foot.classList.remove('idle'); clearTimeout(idleT); idleT=setTimeout(()=>foot.classList.add('idle'),2500); }
+addEventListener('mousemove',wake); wake();
+function toggleFS(){ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }
+document.getElementById('fs').onclick=toggleFS;
+document.getElementById('dl').onclick=()=>window.print();
+document.addEventListener('keydown',e=>{ if(e.key==='f'||e.key==='F') toggleFS(); });
+</script>
+</body>
+</html>
